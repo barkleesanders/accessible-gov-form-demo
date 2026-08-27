@@ -1,0 +1,20 @@
+{
+  "name": "accessible-service-request-hono",
+  "version": "1.0.0",
+  "description": "Accessible government service-request form — Hono on Cloudflare Workers. A drop-in, WCAG 2.1 AA replacement pattern for legacy reCAPTCHA-gated forms.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.90.0"
+  }
+}

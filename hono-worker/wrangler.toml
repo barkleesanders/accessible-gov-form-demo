@@ -1,0 +1,13 @@
+name = "accessible-service-request"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Set with:  wrangler secret put TURNSTILE_SECRET
+# Demo/test secret (always passes): 1x0000000000000000000000000000000AA
+[vars]
+TURNSTILE_SITEKEY = "1x00000000000000000000AA"   # CF test key (always passes) — replace for prod
+
+# Optional: a KV namespace for per-IP rate limiting + storing submitted tickets.
+# [[kv_namespaces]]
+# binding = "TICKETS"
+# id = "<your-kv-id>"
