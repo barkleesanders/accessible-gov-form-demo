@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accessible Service-Request Form — Demo Fix</title>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<style>
+  :root{--ink:#1b1b1b;--muted:#565c65;--line:#a9aeb1;--accent:#005ea2;--ok:#00a91c;--err:#b50909;--bg:#fff;--box:#f0f0f0}
+  @media(prefers-color-scheme:dark){:root{--ink:#e9edf0;--muted:#a9b2bb;--line:#565c65;--accent:#58a6ff;--ok:#4ade80;--err:#f87171;--bg:#12161c;--box:#1c222b}}
+  *{box-sizing:border-box}body{font:17px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);max-width:640px;margin:0 auto;padding:28px 18px}
+  h1{font-size:24px;margin:0 0 6px}.sub{color:var(--muted);margin:0 0 22px}
+  fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 18px;padding:14px 16px}
+  legend{font-weight:700;padding:0 6px}
+  label{display:block;font-weight:600;margin:12px 0 4px}
+  .req{color:var(--err)} .hint{font-weight:400;color:var(--muted);font-size:14px}
+  input,select,textarea{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+  input:focus,select:focus,textarea:focus,button:focus{outline:3px solid var(--accent);outline-offset:1px}
+  textarea{min-height:96px}
+  button{font:inherit;font-weight:700;background:var(--accent);color:#fff;border:0;border-radius:6px;padding:12px 22px;cursor:pointer;margin-top:8px}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}  /* honeypot: hidden from sighted + AT */
+  #summary{border:2px solid var(--err);border-radius:8px;padding:12px 14px;margin:0 0 18px;display:none}
+  #summary[hidden]{display:none}#summary.show{display:block}
+  #summary h2{margin:0 0 6px;font-size:16px;color:var(--err)}#summary a{color:var(--err)}
+  #done{border:2px solid var(--ok);border-radius:8px;padding:16px;display:none}#done.show{display:block}
+  .skip{position:absolute;left:-9999px}.skip:focus{left:8px;top:8px;background:var(--bg);padding:8px;z-index:10}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<a class="skip" href="#form">Skip to the form</a>
+<h1>Report a road hazard</h1>
+<p class="sub">Accessible demo of a public service-request form — the fix for a CAPTCHA that locks out disabled users. <a href="https://github.com/barkleesanders/accessible-gov-form-demo">Source &amp; write-up</a>.</p>
+
+<div id="summary" role="alert" aria-labelledby="sumh" tabindex="-1" hidden><h2 id="sumh">Please fix the following:</h2><ul id="sumlist"></ul></div>
+<div id="done" role="status"><strong>✓ Report received.</strong> Your reference number is <strong id="ref"></strong>. (Demo — nothing is sent to a real agency.)</div>
+
+<form id="form" novalidate>
+  <fieldset>
+    <legend>What and where</legend>
+    <label for="type">Type of problem <span class="req" aria-hidden="true">*</span><span class="hint"> (required)</span></label>
+    <select id="type" name="type" required aria-required="true" autocomplete="off">
+      <option value="">— Select —</option>
+      <option>Roadway – Pothole</option><option>Roadway – Rough pavement</option>
+      <option>Signs – Missing / damaged</option><option>Traffic signal</option>
+      <option>Flooding / drainage</option><option>Other</option>
+    </select>
+
+    <label for="loc">Location <span class="req" aria-hidden="true">*</span><span class="hint"> (required — describe it in words; a map is optional, not required)</span></label>
+    <textarea id="loc" name="loc" required aria-required="true" placeholder="e.g. Northbound US-101 inside the tunnel near the Golden Gate Bridge, Marin County"></textarea>
+
+    <label for="desc">What is wrong <span class="req" aria-hidden="true">*</span><span class="hint"> (required)</span></label>
+    <textarea id="desc" name="desc" required aria-required="true"></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>How to reach you</legend>
+    <label for="email">Email <span class="req" aria-hidden="true">*</span><span class="hint"> (required — we send your tracking number here)</span></label>
+    <input id="email" name="email" type="email" required aria-required="true" autocomplete="email" inputmode="email">
+  </fieldset>
+
+  <!-- Honeypot: real users never see or fill this; bots do. Zero accessibility cost. -->
+  <div class="hp" aria-hidden="true"><label for="company">Company (leave blank)</label><input id="company" name="company" tabindex="-1" autocomplete="off"></div>
+
+  <!-- Cloudflare Turnstile: accessible by default (invisible / non-interactive for most users;
+       built-in screen-reader support). Test sitekey below ALWAYS PASSES so the demo works. -->
+  <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA" data-theme="auto"></div>
+
+  <button type="submit">Submit report</button>
+</form>
+
+<script>
+(function(){
+  var f=document.getElementById('form'), sum=document.getElementById('summary'),
+      list=document.getElementById('sumlist'), done=document.getElementById('done');
+  function fieldsInvalid(){
+    var out=[]; ['type','loc','desc','email'].forEach(function(id){
+      var el=document.getElementById(id); var bad=!el.value.trim();
+      if(id==='email'&&el.value.trim()&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el.value)) bad=true;
+      el.setAttribute('aria-invalid', bad?'true':'false');
+      if(bad) out.push({id:id, label:document.querySelector('label[for='+id+']').textContent.replace(/\s*\*.*$/,'').trim()});
+    }); return out;
+  }
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    // honeypot: silently drop bots
+    if(document.getElementById('company').value){ done.className='show'; return; }
+    var bad=fieldsInvalid();
+    var token=(f.querySelector('[name=cf-turnstile-response]')||{}).value;
+    if(bad.length){
+      list.innerHTML=''; bad.forEach(function(b){ var li=document.createElement('li');
+        var a=document.createElement('a'); a.href='#'+b.id; a.textContent=b.label; a.onclick=function(ev){ev.preventDefault();document.getElementById(b.id).focus();};
+        li.appendChild(a); list.appendChild(li); });
+      sum.hidden=false; sum.className='show'; sum.focus(); return;
+    }
+    sum.hidden=true; sum.className='';
+    // In production the token goes to your Worker (see verify-worker.js) which calls
+    // Cloudflare's siteverify. Here we just confirm the accessible flow end-to-end.
+    document.getElementById('ref').textContent='DEMO-'+Math.abs((token||'x').split('').reduce(function(a,c){return (a*31+c.charCodeAt(0))|0;},7)).toString(36).toUpperCase().slice(0,8);
+    f.style.display='none'; done.className='show'; done.focus&&done.setAttribute('tabindex','-1'); done.focus&&done.focus();
+  });
+})();
+</script>
+</body>
+</html>
