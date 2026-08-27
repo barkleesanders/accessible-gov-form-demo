@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "accessible_gov_form_demo",
+  "project_id": "1909a9bb-3c92-46a8-9433-5ed99d773511"
+}
