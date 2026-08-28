@@ -62,17 +62,31 @@
   <!-- Honeypot: real users never see or fill this; bots do. Zero accessibility cost. -->
   <div class="hp" aria-hidden="true"><label for="company">Company (leave blank)</label><input id="company" name="company" tabindex="-1" autocomplete="off"></div>
 
-  <!-- Cloudflare Turnstile: accessible by default (invisible / non-interactive for most users;
-       built-in screen-reader support). Test sitekey below ALWAYS PASSES so the demo works. -->
-  <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA" data-theme="auto"></div>
+  <!-- Cloudflare Turnstile (test sitekey always passes). Wire the three callbacks Caltrans
+       omitted on reCAPTCHA: success / expired / error. Enable Submit only with a live token. -->
+  <div class="cf-turnstile"
+       data-sitekey="1x00000000000000000000AA"
+       data-theme="auto"
+       data-callback="onTurnstileSuccess"
+       data-expired-callback="onTurnstileExpired"
+       data-error-callback="onTurnstileError"></div>
+  <p id="chalstatus" class="hint" role="status" aria-live="polite"></p>
 
-  <button type="submit">Submit report</button>
+  <button type="submit" id="submitBtn" disabled>Submit report</button>
 </form>
 
 <script>
 (function(){
   var f=document.getElementById('form'), sum=document.getElementById('summary'),
-      list=document.getElementById('sumlist'), done=document.getElementById('done');
+      list=document.getElementById('sumlist'), done=document.getElementById('done'),
+      btn=document.getElementById('submitBtn'), st=document.getElementById('chalstatus');
+  function setBtn(on, msg){
+    btn.disabled=!on;
+    st.textContent=msg||'';
+  }
+  window.onTurnstileSuccess=function(){ setBtn(true, ''); };
+  window.onTurnstileExpired=function(){ setBtn(false, 'Verification expired. The challenge will run again.'); };
+  window.onTurnstileError=function(){ setBtn(false, 'Verification failed. Try again, or use another browser.'); };
   function fieldsInvalid(){
     var out=[]; ['type','loc','desc','email'].forEach(function(id){
       var el=document.getElementById(id); var bad=!el.value.trim();
@@ -87,6 +101,11 @@
     if(document.getElementById('company').value){ done.className='show'; return; }
     var bad=fieldsInvalid();
     var token=(f.querySelector('[name=cf-turnstile-response]')||{}).value;
+    if(!token){
+      setBtn(false, 'Complete the verification before submitting.');
+      st.focus&&st.setAttribute('tabindex','-1'); st.focus();
+      return;
+    }
     if(bad.length){
       list.innerHTML=''; bad.forEach(function(b){ var li=document.createElement('li');
         var a=document.createElement('a'); a.href='#'+b.id; a.textContent=b.label; a.onclick=function(ev){ev.preventDefault();document.getElementById(b.id).focus();};

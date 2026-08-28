@@ -23,6 +23,10 @@ verification. This is a standalone Worker — unrelated to any other site.
 - **Turnstile** replaces reCAPTCHA: non-interactive for most users, screen-reader supported,
   with an accessible challenge when one is needed.
 
+The parent [README](../README.md) lists the live `csr.dot.ca.gov` reCAPTCHA wiring defects
+and the exact Turnstile swap (two HTML lines + one `siteverify` POST). This Worker is that
+server half.
+
 ## Deploy it (an afternoon, start to finish)
 ```bash
 npm install
