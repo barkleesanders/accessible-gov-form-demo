@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@5.9.0/dist/maplibre-gl.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <style>
   /* Hallmark · studied-DNA (source: csr.dot.ca.gov + improvebayarea.com map)
@@ -41,8 +41,10 @@
   .row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
   @media(max-width:700px){.row{grid-template-columns:1fr}}
   .map-card{border:1px solid var(--line);background:var(--paper);margin-top:.4rem}
-  #map{height:var(--map-h);width:100%}
+  #map{height:var(--map-h);width:100%;position:relative}
   @media(min-width:768px){:root{--map-h:360px}}
+  .oak-pin{cursor:grab}
+  .maplibregl-ctrl-attrib{font-size:9px}
   .map-tools{padding:.75rem .9rem;display:flex;flex-direction:column;gap:.55rem}
   .map-tools-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
   .map-tools-row input{flex:1;min-width:0}
@@ -68,7 +70,6 @@
   #done.show{display:block}
   footer{max-width:920px;margin:0 auto;padding:0 1.1rem 2.5rem;color:var(--muted);font-size:.9rem}
   footer a{color:var(--ca-blue)}
-  .leaflet-container{font:inherit}
   [aria-invalid="true"]{border-color:var(--err);border-width:2px}
 </style>
 </head>
@@ -175,7 +176,7 @@
   </form>
 </main>
 <footer>
-  Cloudflare Turnstile instead of reCAPTCHA. Map is optional; typed location is required.
+  Cloudflare Turnstile instead of reCAPTCHA. Map is MapLibre + OpenFreeMap Liberty (same stack as ImproveBayArea). Typed location is required.
   Working copy of <a href="https://github.com/barkleesanders/accessible-gov-form-demo">barkleesanders/accessible-gov-form-demo</a>.
 </footer>
 <script>
@@ -186,33 +187,55 @@
       addr=document.getElementById('address'), sug=document.getElementById('suggestions'),
       coordsEl=document.getElementById('coords'), sv=document.getElementById('sv');
   var pin=null, map, marker, searchT=null;
+  var START=[37.8325,-122.4789];
 
   function setBtn(on, msg){ btn.disabled=!on; st.textContent=msg||''; }
   window.onTurnstileSuccess=function(){ setBtn(true,''); };
   window.onTurnstileExpired=function(){ setBtn(false,'Verification expired. The challenge will run again.'); };
   window.onTurnstileError=function(){ setBtn(false,'Verification failed. Try again, or use another browser.'); };
 
-  map=L.map('map',{scrollWheelZoom:true}).setView([37.8325,-122.4789],13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
-    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:20
-  }).addTo(map);
-  marker=L.marker([37.8325,-122.4789],{draggable:true,autoPan:true}).addTo(map);
-  setTimeout(function(){ map.invalidateSize(); }, 200);
+  function makeUserPin(){
+    var el=document.createElement('div');
+    el.className='oak-pin';
+    el.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 32 32"><path fill="#007749" stroke="#fff" stroke-width="2" d="M16 2C9.4 2 4 7.4 4 14c0 8.5 12 16 12 16s12-7.5 12-16c0-6.6-5.4-12-12-12z"/><circle cx="16" cy="14" r="4" fill="#fff"/></svg>';
+    return el;
+  }
+
+  map=new maplibregl.Map({
+    container:'map',
+    style:'https://tiles.openfreemap.org/styles/liberty',
+    center:[START[1], START[0]],
+    zoom:14,
+    attributionControl:{compact:true}
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
+  marker=new maplibregl.Marker({element:makeUserPin(), draggable:true, anchor:'bottom'})
+    .setLngLat([START[1], START[0]])
+    .addTo(map);
+  map.on('load', function(){ map.resize(); });
+  setTimeout(function(){ map.resize(); }, 250);
 
   function setPin(lat,lng,opts){
     pin={lat:lat,lng:lng};
-    marker.setLatLng([lat,lng]);
+    marker.setLngLat([lng,lat]);
     document.getElementById('lat').value=lat.toFixed(6);
     document.getElementById('lng').value=lng.toFixed(6);
     coordsEl.textContent=lat.toFixed(5)+', '+lng.toFixed(5);
     sv.hidden=false;
     sv.href='https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+lat+','+lng;
-    if(!opts||!opts.silentFly) map.panTo([lat,lng]);
+    if(!opts||!opts.silentFly) map.easeTo({center:[lng,lat]});
     reverse(lat,lng);
   }
-  map.on('click',function(e){ setPin(e.latlng.lat,e.latlng.lng); });
-  marker.on('dragend',function(){ var ll=marker.getLatLng(); setPin(ll.lat,ll.lng,{silentFly:true}); });
-  setPin(37.8325,-122.4789,{silentFly:true});
+  map.on('click',function(ev){
+    if(ev.originalEvent && ev.originalEvent.target && ev.originalEvent.target.closest &&
+       ev.originalEvent.target.closest('.maplibregl-popup')) return;
+    setPin(ev.lngLat.lat, ev.lngLat.lng);
+  });
+  marker.on('dragend',function(){
+    var ll=marker.getLngLat();
+    setPin(ll.lat, ll.lng, {silentFly:true});
+  });
+  setPin(START[0], START[1], {silentFly:true});
 
   function fillLoc(parts){
     var loc=document.getElementById('loc');
@@ -265,8 +288,8 @@
   document.getElementById('gps').addEventListener('click',function(){
     if(!navigator.geolocation){ st.textContent='GPS is not available in this browser.'; return; }
     navigator.geolocation.getCurrentPosition(function(pos){
-      setPin(pos.coords.latitude, pos.coords.longitude);
-      map.setZoom(16);
+      setPin(pos.coords.latitude, pos.coords.longitude, {silentFly:true});
+      map.easeTo({center:[pos.coords.longitude, pos.coords.latitude], zoom:17});
     }, function(){ st.textContent='Could not read GPS. Type an address or tap the map.'; },
     {enableHighAccuracy:true,timeout:8000});
   });
