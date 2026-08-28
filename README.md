@@ -1,6 +1,7 @@
 # Accessible service-request form — a working fix for a CAPTCHA that locks out disabled users
 
 **Live demo:** https://barkleesanders.github.io/accessible-gov-form-demo/
+(Caltrans CSR layout + ImproveBayArea-style tap/drag map. Red **DEMO** bar so it cannot be mistaken for the official form. Map is optional; typed location is required.)
 **Why this exists:** a state road-hazard reporting form (`csr.dot.ca.gov`) can only be
 submitted by completing a Google reCAPTCHA, with **no accessible alternative** — so a
 disabled person cannot report a hazard at all. This repo shows that the accessible fix
