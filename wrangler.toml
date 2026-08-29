@@ -3,3 +3,15 @@ main = "verify-worker.js"
 compatibility_date = "2024-11-01"
 # Set the secret before deploy:  wrangler secret put TURNSTILE_SECRET
 # Demo/test secret (always passes): 1x0000000000000000000000000000000AA
+
+# Workers Logs. `enabled` turns on the observability pipeline; head_sampling_rate=1
+# keeps 100% of invocations; invocation_logs=true retains the one-line-per-request
+# record carrying the outcome (ok / exception / exceededCpu) — without it a Worker
+# that throws before any console.log leaves no trace. Takes effect on the NEXT
+# deploy; editing this file changes nothing until the Worker is redeployed.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+invocation_logs = true
