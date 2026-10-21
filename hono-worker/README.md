@@ -1,11 +1,14 @@
 # Hono + Cloudflare Workers — accessible service-request form
 
-A **complete, deployable** road-hazard / service-request form that a public agency can copy
-as-is. It is the working counterpart to the static demo in the parent repo: same accessibility,
+A road-hazard / service-request demonstration that a public agency can adapt.
+It is the working counterpart to the static demo in the parent repo: same accessibility,
 but server-rendered by [Hono](https://hono.dev) on Cloudflare Workers with real server-side
-verification. This is a standalone Worker — unrelated to any other site.
+verification. This is a standalone Worker — unrelated to any other site. Demo references
+are not stored or filed with an agency; connect persistence and the real ticketing backend
+before using this for operational intake.
 
 ## What it does
+
 - **GET `/`** — renders the accessible form (server-side, no client framework required).
 - **POST `/submit`** —
   1. **Honeypot** check (silent accept-and-drop for bots).
@@ -15,6 +18,7 @@ verification. This is a standalone Worker — unrelated to any other site.
      (Production TODO markers show where to persist to KV/D1 or POST to a ticketing backend.)
 
 ## Accessibility (WCAG 2.1 AA)
+
 - Every field has a real `<label>`; required fields carry `aria-required="true"`.
 - On error, a `role="alert"` **error summary** with in-page anchor links, and focus is moved to it (3.3.1).
 - Invalid fields get `aria-invalid` + `aria-describedby` pointing at the message.
@@ -28,6 +32,7 @@ and the exact Turnstile swap (two HTML lines + one `siteverify` POST). This Work
 server half.
 
 ## Deploy it (an afternoon, start to finish)
+
 ```bash
 npm install
 npx wrangler login
@@ -35,21 +40,24 @@ npx wrangler secret put TURNSTILE_SECRET   # your Turnstile secret (test value: 
 # edit wrangler.toml -> TURNSTILE_SITEKEY = your real sitekey (test: 1x00000000000000000000AA)
 npx wrangler deploy
 ```
-Local dev: `npx wrangler dev`. If your machine's outbound TLS is intercepted (so `siteverify`
-can't be reached locally), add `--var DEV_SKIP_TURNSTILE:1` for local testing **only**. It is
-off in production and the code fails **closed** (unverified → rejected, never a 500) if the
-verify call ever errors.
+Local dev: `npm run dev`. Use Cloudflare's published test keys for isolated testing.
+There is no verification bypass flag. A real site key without a configured secret is
+rejected; provider errors fail closed. Forms reject malformed bodies, file fields and
+payloads over 64 KiB. `npm run verify` runs lint, types, handler tests, actual workerd
+smoke checks and dependency auditing without filing anything with an agency.
 
 ## Verified behavior (local)
-| Request | Result |
-|---|---|
-| `GET /` | 200 — accessible form (aria-required, Turnstile, skip link) |
-| `POST /submit` missing fields | **422** + `role="alert"` summary listing each problem |
-| `POST /submit` valid + verified | **200** + tracking ref `SR-XXXXXXXX` |
-| `POST /submit` honeypot filled | 200, silently dropped (no ticket) |
-| `POST /submit` bad/unreachable token | **422** verification error — fails closed, not 500 |
+
+| Request                              | Result                                                      |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `GET /`                              | 200 — accessible form (aria-required, Turnstile, skip link) |
+| `POST /submit` missing fields        | **422** + `role="alert"` summary listing each problem       |
+| `POST /submit` valid + verified      | **200** + tracking ref `SR-XXXXXXXX`                        |
+| `POST /submit` honeypot filled       | 200, silently dropped (no ticket)                           |
+| `POST /submit` bad/unreachable token | **422** verification error — fails closed, not 500          |
 
 ## Files
+
 - `src/index.ts` — the whole app (~185 lines).
 - `wrangler.toml` — Worker config + Turnstile sitekey var.
 - `package.json`, `tsconfig.json` — Hono 4, TypeScript 5, strict.

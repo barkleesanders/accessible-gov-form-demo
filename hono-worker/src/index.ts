@@ -1,16 +1,16 @@
-import { Hono } from 'hono'
-import { html, raw } from 'hono/html'
+import { Hono } from 'hono';
+import { html, raw } from 'hono/html';
+import { FormError, readForm } from '../../form-data.js';
 
 type Bindings = {
-  TURNSTILE_SECRET?: string // wrangler secret put TURNSTILE_SECRET  (test: 1x0000000000000000000000000000000AA)
-  TURNSTILE_SITEKEY?: string // vars in wrangler.toml (test: 1x00000000000000000000AA)
-  DEV_SKIP_TURNSTILE?: string // LOCAL ONLY: set to "1" in `wrangler dev` when outbound TLS is blocked. NEVER set in production.
-}
+  TURNSTILE_SECRET?: string; // wrangler secret put TURNSTILE_SECRET  (test: 1x0000000000000000000000000000000AA)
+  TURNSTILE_SITEKEY?: string; // vars in wrangler.toml (test: 1x00000000000000000000AA)
+};
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings }>();
 
-const TEST_SITEKEY = '1x00000000000000000000AA'
-const TEST_SECRET = '1x0000000000000000000000000000000AA'
+const TEST_SITEKEY = '1x00000000000000000000AA';
+const TEST_SECRET = '1x0000000000000000000000000000000AA';
 
 // ---- shared page shell (accessible: lang, single h1, skip link, theme-color) ----
 const page = (title: string, body: ReturnType<typeof html>) => html`<!doctype html>
@@ -58,23 +58,32 @@ ${body}
 </footer>
 </main>
 </body>
-</html>`
+</html>`;
 
 // ---- the form ----
-function formPage(sitekey: string, errors: Record<string, string> = {}, values: Record<string, string> = {}) {
-  const errList = Object.entries(errors)
-  const v = (k: string) => values[k] ? ` ` + `value="${values[k].replace(/"/g, '&quot;')}"` : ''
-  const inv = (k: string) => (errors[k] ? ' aria-invalid="true"' : '')
-  const desc = (k: string) => (errors[k] ? ` aria-describedby="${k}-err"` : '')
-  const emsg = (k: string) => (errors[k] ? html`<p class="hint" id="${k}-err" style="color:var(--err)">${errors[k]}</p>` : '')
-  return page('Report a road hazard', html`
+function formPage(
+  sitekey: string,
+  errors: Record<string, string> = {},
+  values: Record<string, string> = {},
+) {
+  const errList = Object.entries(errors);
+  const v = (k: string) => (values[k] ? ` value="${values[k].replace(/"/g, '&quot;')}"` : '');
+  const inv = (k: string) => (errors[k] ? ' aria-invalid="true"' : '');
+  const desc = (k: string) => (errors[k] ? ` aria-describedby="${k}-err"` : '');
+  const emsg = (k: string) =>
+    errors[k] ? html`<p class="hint" id="${k}-err" style="color:var(--err)">${errors[k]}</p>` : '';
+  return page(
+    'Report a road hazard',
+    html`
     <h1>Report a road hazard</h1>
-    ${errList.length
-      ? html`<div class="summary" role="alert" tabindex="-1" id="errsum">
+    ${
+      errList.length
+        ? html`<div class="summary" role="alert" tabindex="-1" id="errsum">
           <h2>There ${errList.length === 1 ? 'is 1 problem' : `are ${errList.length} problems`} with your report</h2>
           <ul>${raw(errList.map(([k, m]) => `<li><a href="#${k}">${m}</a></li>`).join(''))}</ul>
         </div>`
-      : ''}
+        : ''
+    }
     <form id="form" method="post" action="/submit" novalidate>
       <label for="description">What is the hazard? <span class="req">(required)</span></label>
       <textarea id="description" name="description" required aria-required="true"${raw(inv('description'))}${raw(desc('description'))}>${values.description ?? ''}</textarea>
@@ -112,77 +121,119 @@ function formPage(sitekey: string, errors: Record<string, string> = {}, values: 
       // Move focus to the error summary if the server returned one (WCAG 3.3.1).
       var s = document.getElementById('errsum'); if (s) s.focus();
     </script>
-  `)
+  `,
+  );
 }
 
-app.get('/', (c) => c.html(formPage(c.env.TURNSTILE_SITEKEY || TEST_SITEKEY)))
+app.get('/', (c) => c.html(formPage(c.env.TURNSTILE_SITEKEY || TEST_SITEKEY)));
 
 // ---- verify Turnstile server-side (the actual bot gate) ----
 async function verifyTurnstile(token: string, secret: string, ip?: string): Promise<boolean> {
-  if (!token) return false
+  if (!token) return false;
   try {
-    const body = new FormData()
-    body.append('secret', secret)
-    body.append('response', token)
-    if (ip) body.append('remoteip', ip)
-    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body })
-    const j = (await r.json()) as { success: boolean }
-    return j.success === true
+    const body = new FormData();
+    body.append('secret', secret);
+    body.append('response', token);
+    if (ip) body.append('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) return false;
+    const j = (await r.json()) as { success: boolean };
+    return j.success === true;
   } catch {
     // Network/verify failure -> fail closed (treat as unverified) rather than 500.
-    return false
+    return false;
   }
 }
 
 function genRef(): string {
   // Deterministic, human-readable tracking ref. crypto is available in Workers.
-  const hex = crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()
-  return `SR-${hex}`
+  const hex = crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+  return `SR-${hex}`;
 }
 
 app.post('/submit', async (c) => {
-  const form = await c.req.formData()
-  const val = (k: string) => (form.get(k) ?? '').toString().trim()
+  let form: FormData;
+  try {
+    form = await readForm(c.req.raw);
+  } catch (error) {
+    return c.text(
+      error instanceof FormError ? error.message : 'Send a valid form.',
+      error instanceof FormError && error.status === 413 ? 413 : 400,
+    );
+  }
+  const val = (k: string) => (form.get(k) ?? '').toString().trim();
 
   // 1) Honeypot — silently accept-and-drop bots (never reveal it).
-  if (val('company') !== '') return c.html(page('Report received', html`<div class="ok"><h1>Report received</h1><p>Thank you.</p></div>`))
+  if (val('company') !== '')
+    return c.html(
+      page(
+        'Report received',
+        html`<div class="ok"><h1>Report received</h1><p>Thank you.</p></div>`,
+      ),
+    );
 
   // 2) Server-side field validation (never trust the client).
-  const values = { description: val('description'), location: val('location'), email: val('email'), name: val('name'), phone: val('phone') }
-  const errors: Record<string, string> = {}
-  if (!values.description) errors.description = 'Describe the hazard.'
-  if (!values.location) errors.location = 'Enter where the hazard is.'
-  if (!values.email) errors.email = 'Enter your email address.'
-  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email)) errors.email = 'Enter a valid email address.'
+  const values = {
+    description: val('description'),
+    location: val('location'),
+    email: val('email'),
+    name: val('name'),
+    phone: val('phone'),
+  };
+  const errors: Record<string, string> = {};
+  if (!values.description) errors.description = 'Describe the hazard.';
+  if (!values.location) errors.location = 'Enter where the hazard is.';
+  if (!values.email) errors.email = 'Enter your email address.';
+  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email))
+    errors.email = 'Enter a valid email address.';
 
   // 3) Turnstile (accessible CAPTCHA) — the bot gate. Test secret always passes.
-  const token = val('cf-turnstile-response')
-  const secret = c.env.TURNSTILE_SECRET || TEST_SECRET
-  const ip = c.req.header('CF-Connecting-IP')
-  // DEV_SKIP_TURNSTILE is a LOCAL-ONLY escape for `wrangler dev` when outbound TLS is unavailable. Off in prod.
-  const humanOk = c.env.DEV_SKIP_TURNSTILE === '1' ? true : await verifyTurnstile(token, secret, ip)
-  if (!humanOk) errors['cf-turnstile-response'] = 'Please complete the verification checkbox.'
+  const token = val('cf-turnstile-response');
+  const sitekey = c.env.TURNSTILE_SITEKEY || TEST_SITEKEY;
+  const secret = c.env.TURNSTILE_SECRET || (sitekey === TEST_SITEKEY ? TEST_SECRET : '');
+  if (!secret) return c.text('Verification is not configured.', 503);
+  const ip = c.req.header('CF-Connecting-IP');
+  const humanOk = await verifyTurnstile(token, secret, ip);
+  if (!humanOk) errors['cf-turnstile-response'] = 'Please complete the verification checkbox.';
 
   if (Object.keys(errors).length) {
-    return c.html(formPage(c.env.TURNSTILE_SITEKEY || TEST_SITEKEY, errors, values), 422)
+    return c.html(formPage(c.env.TURNSTILE_SITEKEY || TEST_SITEKEY, errors, values), 422);
   }
 
   // 4) Accept. In production: persist to KV/D1 and/or POST to the ticketing backend here.
-  const ref = genRef()
+  const ref = genRef();
   // await c.env.TICKETS?.put(ref, JSON.stringify({ ...values, ip, at: new Date().toISOString() }))
 
-  return c.html(page('Report received', html`
+  return c.html(
+    page(
+      'Demo report received',
+      html`
     <div class="ok">
-      <h1>Report received</h1>
-      <p>Your tracking number is <span class="ref">${ref}</span>. Save it to check status.</p>
+      <h1>Demo report received</h1>
+      <p>This demonstration has not filed, stored, or sent a report to an agency.</p>
+      <p>Your demo reference is <span class="ref">${ref}</span>.</p>
       <p><strong>Hazard:</strong> ${values.description}</p>
       <p><strong>Location:</strong> ${values.location}</p>
     </div>
     <p style="margin-top:1.2rem"><a href="/">Report another hazard</a></p>
-  `))
-})
+  `,
+    ),
+  );
+});
 
 // Accessible 404
-app.notFound((c) => c.html(page('Page not found', html`<h1>Page not found</h1><p><a href="/">Go to the report form</a>.</p>`), 404))
+app.notFound((c) =>
+  c.html(
+    page(
+      'Page not found',
+      html`<h1>Page not found</h1><p><a href="/">Go to the report form</a>.</p>`,
+    ),
+    404,
+  ),
+);
 
-export default app
+export default app;
