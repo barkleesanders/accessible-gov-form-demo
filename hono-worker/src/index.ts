@@ -112,7 +112,8 @@ function formPage(
         <input id="company" name="company" type="text" tabindex="-1" autocomplete="off">
       </div>
 
-      <div class="cf-turnstile" data-sitekey="${sitekey}" style="margin-top:1.1rem"></div>
+      <div id="cf-turnstile-response" class="cf-turnstile" data-sitekey="${sitekey}" tabindex="-1"${raw(desc('cf-turnstile-response'))} style="margin-top:1.1rem"></div>
+      ${emsg('cf-turnstile-response')}
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
       <button type="submit">Submit report</button>

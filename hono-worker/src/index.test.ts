@@ -66,7 +66,12 @@ describe('actual Hono request handler', () => {
         throw new Error('synthetic offline');
       }),
     );
-    expect((await app.fetch(post(), env)).status).toBe(422);
+    const response = await app.fetch(post(), env);
+    expect(response.status).toBe(422);
+    const html = await response.text();
+    expect(html).toContain('href="#cf-turnstile-response"');
+    expect(html).toContain('id="cf-turnstile-response"');
+    expect(html).toContain('id="cf-turnstile-response-err"');
   });
   it('rejects malformed form bodies as client errors', async () => {
     expect(
