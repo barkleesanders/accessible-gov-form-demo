@@ -1,5 +1,8 @@
 name = "accessible-form-verify"
 main = "verify-worker.js"
 compatibility_date = "2024-11-01"
+# Pin the public surface CLOSED: without this, every `wrangler deploy` re-opens
+# <name>.cloudflare.app (see ~/.claude/skills/ship/tools/wrangler-surface-config-check.py).
+preview_urls = false
 # Set the secret before deploy:  wrangler secret put TURNSTILE_SECRET
 # Demo/test secret (always passes): 1x0000000000000000000000000000000AA
