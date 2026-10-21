@@ -5,16 +5,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "check": "tsc --noEmit"
+    "dev": "wrangler dev -c ./wrangler.toml",
+    "deploy": "npm run verify && wrangler deploy -c ./wrangler.toml",
+    "check": "tsc --noEmit",
+    "lint": "biome check . ../form-data.js ../verify-worker.js --error-on-warnings",
+    "test:runtime": "node scripts/runtime-smoke.mjs",
+    "test": "vitest run",
+    "verify": "npm run lint && npm run check && npm test && npm run test:runtime && npm audit --audit-level=low"
   },
   "dependencies": {
-    "hono": "^4.6.14"
+    "hono": "^4.13.13"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241127.0",
+    "@cloudflare/workers-types": "^5.20261021.1",
     "typescript": "^5.7.2",
-    "wrangler": "^3.90.0"
+    "wrangler": "^4.151.3",
+    "vitest": "^5.0.5",
+    "@biomejs/biome": "^2.6.2",
+    "miniflare": "5.20261019.1-beta"
+  },
+  "engines": {
+    "node": ">=22.22.0"
   }
 }
